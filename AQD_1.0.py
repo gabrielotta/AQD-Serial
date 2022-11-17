@@ -4,8 +4,8 @@
 # Leandro Felix / Gabriel
 
 # imports ///////////////////////////////////////////////////////////////////////////////////////////////////
-import serial
-import serial.tools.list_ports
+from custom_serial import Serial as serial
+from fh import File_Handler as fh
 import time
 import PySimpleGUI as sg
 import threading
@@ -30,122 +30,109 @@ blocked = False             # bloqueia / libera a execução do Thread
 cc_ended = False            # status das intruções do Thread. True = finalizadas. False = em execução
 filename = ''               # string que armazena o nome do arquivo
 conec_started = False
+cs = serial()
+fh = fh()
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
+def check_thread(main_window):
 
-# FUNÇÕES ///////////////////////////////////////////////////////////////////////////////////////////////////
-
-# abertura da porta serial
-def openser_port(main_window, baud_rate, porta):
-
-    global ser, porta_txt, flag_conec, conec_started
-    
-    try:
-        
-        if porta == '0':             # port = zero significa que a seleção de porta de ser automatica
-            
-            ports = serial.tools.list_ports.comports(include_links=False)
-            sub_str = 'Bluetooth'   # sub strings de exclusão para porta serial
-            sub_str2 = 'bluetooth'  # portas virtuais relacionadas ao bluetooth do note
-            sub_str3 = 'COM1 '      # porta fisica deve ser ignorada também
-            
-            for port in ports :
-                str1 = ''.join(port) # transforma a lista em string
-                if sub_str in str1 or sub_str2 in str1 or sub_str3 in str1: # se for uma porta relacionada ao bluetooth...
-                    pass
-                else:           # se não é uma porta bluetooth ou fisica, então o endereço na variavel             
-                    port_saved = port
-                    
-            ser = serial.Serial(port_saved.device)       
-            if ser.isOpen():    # caso a porta esteja aberta...
-                ser.close()     # fecha a porta
-
-            port_used = port_saved.device
-        else:                   # quando maior que 0 significa que a abertura de porta está sendo forçada pelo usuario
-            port_used = porta
-
-        ser = serial.Serial(port_used, baud_rate, timeout=1, write_timeout=1)
-        ser.flushInput()    # limpa o bufer de entrada
-        ser.flushOutput()   # limpa o buffer de saída
-        porta_txt = 'Porta: ' + port_used
-        main_window.Element('porta').Update(value=porta_txt)
-        flag_conec = True
-        conec_started = True
-        print('porta ' + port_used + ' foi aberta\n')
-        
-    except:
-        porta_txt = 'Porta: '
-        main_window.Element('porta').Update(value=porta_txt)
-        sg.popup_error('Erro ao tentar abrir a porta serial. Conecte o cabo de comunicação na porta USB',
-                       icon='img/aqd_serial.ico')
-#////////////////////////////////////////////////////////////////////////////////////////////////////////////
-def check_serial(main_window):
-
-    global text_area, blocked, cc_ended, porta_txt, flag_conec, conec_started
-    ident = "A420"              # identificador para a localização da substring
-    ident_ok = False            # flag que sinaliza que a conexão (reconexão) serial ocorreu
     starttime = time.time()     # tempo para blink do banner
     timenow = starttime         
     image_index = 1             # imagem 1 ou imagem 2 a cada 1s
 
     while True:
+        global text_area, blocked, cc_ended, porta_txt, flag_conec, conec_started
 
-        if blocked == False:    # esta função é bloqueada quando uma janela relativa ao Menu é aberta, pois ocorre erro - blocked == False:
+        serial_data = cs.check_serial(text_area, blocked, porta_txt, flag_conec, conec_started)
 
-            cc_ended = False    # como não está bloqueada a função, esta var. deve ser = False
-            
-            if conec_started == True and flag_conec == True:
-                conec_started = False
-                main_window.Element('status_com').Update(filename='img/conectado.png', subsample = 2)
-
+        if len(serial_data) != 0:
             try:
-                buffer = ser.readline()
-                string_1 = buffer.decode('utf-8')   # converte os dados do tipo byte em strin
+                for data in serial_data:
+                    if data[0] == False:
+                        main_window['status_com'].Update(filename='img/conectado.png', subsample = 2)
+
+                    if data[1] == False:
+                        main_window['terminal'].Update(disabled=False)
+
+                    if data[2] == '-THREAD-':
+                        main_window.write_event_value('-THREAD-','')
                     
-                if len (string_1) > 0 and ident in string_1:              # string é valida se tiver tamanho maior que zero. Tamanho zero == ocorrencia de timeout
-                    main_window.Find('terminal').Update(disabled=False)
-                    text_area = string_1
-                    main_window.write_event_value('-THREAD-','')
+                    if len(data[3]) > 0:
+                        text_area = data[3]
+
+                    if data[4] != None:
+                        main_window['porta'].Update(value=porta_txt)
+            except:
+                pass
+
+        # sinalização através de banner piscante    
+        timenow = time.time()           # obtem a contagem de tempo atual
+        if flag_conec == False and timenow > starttime+0.500:
+            starttime = time.time()     # atuailiza o valor referencia
+            if image_index == 1:
+                main_window.Element('status_com').Update(filename='img/desconec_gray.png', subsample = 2)
+                image_index = 2
+                winsound.Beep(700, 470)
+            else:
+                image_index = 1
+                main_window.Element('status_com').Update(filename='img/desconec_red.png', subsample = 2)
+                winsound.Beep(900, 470)
+
+# FUNÇÕES ///////////////////////////////////////////////////////////////////////////////////////////////////
+# def check_serial(main_window):
+
+#     global text_area, blocked, cc_ended, porta_txt, flag_conec, conec_started
+#     ident = "A420"              # identificador para a localização da substring
+#     ident_ok = False            # flag que sinaliza que a conexão (reconexão) serial ocorreu
+#     starttime = time.time()     # tempo para blink do banner
+#     timenow = starttime         
+#     image_index = 1             # imagem 1 ou imagem 2 a cada 1s
+
+#     while True:
+
+#         if blocked == False:    # esta função é bloqueada quando uma janela relativa ao Menu é aberta, pois ocorre erro - blocked == False:
+
+#             cc_ended = False    # como não está bloqueada a função, esta var. deve ser = False
+            
+#             if conec_started == True and flag_conec == True:
+#                 conec_started = False
+#                 main_window['status_com'].Update(filename='img/conectado.png', subsample = 2)
+
+#             try:
+#                 buffer = ser.readline()
+#                 string_1 = buffer.decode('utf-8')   # converte os dados do tipo byte em strin
+                    
+#                 if len (string_1) > 0 and ident in string_1:              # string é valida se tiver tamanho maior que zero. Tamanho zero == ocorrencia de timeout
+#                     main_window.Find('terminal').Update(disabled=False)
+#                     text_area = string_1
+#                     main_window.write_event_value('-THREAD-','')
                 
-                flag_conec = True                   # sinaliza através da flag que a porta está aberta
+#                 flag_conec = True                   # sinaliza através da flag que a porta está aberta
                 
-            except:                                 # porta não estando aberta causa erro e por consequencia o salto para o 'except'
-                flag_conec = False
+#             except:                                 # porta não estando aberta causa erro e por consequencia o salto para o 'except'
+#                 flag_conec = False
             
             
 
-            if flag_conec == False and porta_txt != 'Porta: ':  # informa que a porta COM está fechada
-                print('porta COM foi fechada\n')
-                porta_txt = 'Porta: '
-                main_window.Element('porta').Update(value=porta_txt)
-                starttime = time.time()
+#             if flag_conec == False and porta_txt != 'Porta: ':  # informa que a porta COM está fechada
+#                 # print('porta COM foi fechada\n')
+#                 porta_txt = 'Porta: '
+#                 main_window['porta'].Update(value=porta_txt)
+#                 starttime = time.time()
 
-            # sinalização através de banner piscante    
-            timenow = time.time()           # obtem a contagem de tempo atual
-            if flag_conec == False and timenow > starttime+0.500:
-                starttime = time.time()     # atuailiza o valor referencia
-                if image_index == 1:
-                    main_window.Element('status_com').Update(filename='img/desconec_gray.png', subsample = 2)
-                    image_index = 2
-                    winsound.Beep(700, 470)
-                else:
-                    main_window.Element('status_com').Update(filename='img/desconec_red.png', subsample = 2)
-                    image_index = 1
-                    winsound.Beep(900, 470)
+#             # sinalização através de banner piscante    
+#             timenow = time.time()           # obtem a contagem de tempo atual
+#             if flag_conec == False and timenow > starttime+0.500:
+#                 starttime = time.time()     # atuailiza o valor referencia
+#                 if image_index == 1:
+#                     main_window['status_com'].Update(filename='img/desconec_gray.png', subsample = 2)
+#                     image_index = 2
+#                     winsound.Beep(700, 470)
+#                 else:
+#                     main_window['status_com'].Update(filename='img/desconec_red.png', subsample = 2)
+#                     image_index = 1
+#                     winsound.Beep(900, 470)
 
-            cc_ended = True # informa que a função foi finalizada. Informação usada para abertura de janel do menu
-#////////////////////////////////////////////////////////////////////////////////////////////////////////////
-def save_file(texto, filename: str):
-
-    try:
-        with open(filename, 'w') as file:
-            file.write(texto)
-            filename = filename.replace('data', '')
-            filename = filename.replace('/', '')
-            filename = filename.replace('.txt', '')
-            print('Arquivo salvo com o nome: ' + '"' + filename + '"' + ' na pasta data.\n')
-            
-    except:
-        sg.popup_error('Erro ao tentar salvar o arquivo de Log', icon='img/aqd_serial.ico')
+#             cc_ended = True # informa que a função foi finalizada. Informação usada para abertura de janel do menu
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
 def show_sobre():
     sg.PopupNoTitlebar(
@@ -155,7 +142,6 @@ def show_sobre():
         """
     )        
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    
 # layout da main window /////////////////////////////////////////////////////////////////////////////////////
 menu_layout = ( ["Arquivo", ["Sair"]],
                 ["Ajuda", ['Como usar o AQD Serial', 'Sobre']]
@@ -193,11 +179,19 @@ main_window.finalize()  # finaliza a criação da janela. Sem este comando ocorr
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 # abertura da porta serial //////////////////////////////////////////////////////////////////////////////////      
-openser_port(main_window, baud_rate, port)
+abertura, flag_conec, conec_started, ser = cs.openser_port(baud_rate, port)
+if type(abertura) == int:
+    porta_txt = 'Porta: '
+    main_window['porta'].Update(value=porta_txt)
+    sg.popup_error('Erro ao tentar abrir a porta serial. Conecte o cabo de comunicação na porta USB',
+                    icon='img/aqd_serial.ico')
+
+elif type(abertura) == str:
+    main_window['porta'].Update(value=porta_txt)
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 # ccriação do Thread relativo a comunicação serial //////////////////////////////////////////////////////////   
-threading.Thread(target=check_serial, args=(main_window,), daemon=True).start()
+threading.Thread(target=check_thread, args=(main_window,), daemon=True).start()
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 # delay para evitar bug na criação da main_window e ação de abrir ///////////////////////////////////////////
@@ -234,7 +228,7 @@ while True:
         try:
             ser.close()
             baud_rate = values['baud']
-            openser_port(main_window, baud_rate, port)
+            cs.openser_port(baud_rate, port)
         except:
             pass
 
@@ -252,7 +246,7 @@ while True:
         except:
             pass
         
-        openser_port(main_window, baud_rate, port)   # chama a função que abre a nova porta serial
+        cs.openser_port(baud_rate, port)   # chama a função que abre a nova porta serial
     
     # limpar o texto que está no terminal
     if event == 'clear':                             
@@ -290,7 +284,9 @@ while True:
         
         # fomatação do nome do arquivo
         filename = 'data/' + 'Log ' + time_now + '.txt'  # cria o nome do arquivo  
-        save_file(text_area + " m²", filename)           # chama a função que salva o arquivo
+        save = fh.save_file(text_area + " m²", filename)           # chama a função que salva o arquivo
+        if type(save) != str:
+            sg.popup_error('Erro ao tentar salvar o arquivo de Log', icon='img/aqd_serial.ico')
 
         # desabilita a atualização do terminal (nada pode ser escrito ou apagado do terminal pelo operador)
         main_window.Find('terminal').Update(disabled=True)
