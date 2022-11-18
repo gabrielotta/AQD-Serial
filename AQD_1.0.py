@@ -187,6 +187,7 @@ if type(abertura) == int:
                     icon='img/aqd_serial.ico')
 
 elif type(abertura) == str:
+    print(abertura + ' foi aberta\n')
     main_window['porta'].Update(value=porta_txt)
 #////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
