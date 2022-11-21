@@ -2,13 +2,6 @@
 # imports ///////////////////////////////////////////////////////////////////////////////////////////////////
 import serial
 import serial.tools.list_ports
-import time
-import os
-import datetime
-import winsound
-#from elevate import elevate
-#elevate(show_console=False)
-
 # variaveis globais //////////////////////////////////////////////////////////////////////////////////////////
 baud_list = [9600, 19200, 38400, 57600, 115200, 128000, 230400, 256000, 460800, 921600]
 baud_rate = 9600
@@ -60,48 +53,30 @@ class Serial():
             porta_txt = 'Porta: ' + port_used
             flag_conec = True
             conec_started = True
-            # print('porta ' + port_used + ' foi aberta\n')
             return porta_txt, flag_conec, conec_started, ser
             
         except:
             #### cria a popup de erro, entao deve retornar um código de erro
             return 0, flag_conec, conec_started, ser
     #////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    def check_serial(self, text_area, blocked, porta_txt, flag_conec, conec_started):
-
-        retorno = []
-
-        ident = "A420"              # identificador para a localização da substring
-        ident_ok = False            # flag que sinaliza que a conexão (reconexão) serial ocorreu
-
-        if blocked == False:    # esta função é bloqueada quando uma janela relativa ao Menu é aberta, pois ocorre erro - blocked == False:
-            
-            if conec_started == True and flag_conec == True:
-                conec_started = False
-                retorno.append(conec_started)
-
-            try:
-                buffer = ser.readline()
-                string_1 = buffer.decode('utf-8')   # converte os dados do tipo byte em string
-                    
-                if len (string_1) > 0 and ident in string_1:              # string é valida se tiver tamanho maior que zero. Tamanho zero == ocorrencia de timeout
-                    retorno.append(False)
-                    text_area = string_1
-                    retorno.append('-THREAD-')
-                    retorno.append(text_area)
+    def check_serial(self, porta_txt, flag_conec):
+        ident = "A420"              # identificador para a localização da substring   
+        retorno = {"flag_conec":bool, "porta_txt":str, "text_area":str}
+        try:
+            buffer = ser.readline()
+            string_1 = buffer.decode('utf-8')   # converte os dados do tipo byte em string
                 
-                flag_conec = True                   # sinaliza através da flag que a porta está aberta
-                
-            except:                                 # porta não estando aberta causa erro e por consequencia o salto para o 'except'
-                flag_conec = False
-            
-            
+            if len (string_1) > 0 and ident in string_1:              # string é valida se tiver tamanho maior que zero. Tamanho zero == ocorrencia de timeout
+                text_area = string_1
+                retorno["text_area"] = text_area
 
-            if flag_conec == False and porta_txt != 'Porta: ':  # informa que a porta COM está fechada
-                # print('porta COM foi fechada\n')
-                porta_txt = 'Porta: '
-                retorno.append(porta_txt)
-                starttime = time.time()
+            retorno['flag_conec'] = True                   # sinaliza através da flag que a porta está aberta
+            
+        except:                                 # porta não estando aberta causa erro e por consequencia o salto para o 'except'
+            retorno['flag_conec'] = False
 
-            return retorno
+        if flag_conec == False and porta_txt != 'Porta: ':  # informa que a porta COM está fechada
+            porta_txt = 'Porta: '
+            retorno['porta_txt'] = porta_txt
+
         return retorno
